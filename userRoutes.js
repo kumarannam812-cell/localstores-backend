@@ -27,7 +27,7 @@ router.post("/signup", (req, res) => {
     }
 
     db.query(
-      "INSERT INTO users (name, phone, location) VALUES (?, ?, ?)", 
+      "INSERT INTO users (name, phone, address) VALUES (?, ?, ?)", 
       [name, phone, location || null], 
       (err, result) => {
         if (err) {
@@ -36,7 +36,7 @@ router.post("/signup", (req, res) => {
         }
         res.status(201).json({ 
           success: true, 
-          user: { id: result.insertId, name, phone, location: location || "" } 
+          user: { id: result.insertId, name, phone, address: location || "" } 
         });
       }
     );
