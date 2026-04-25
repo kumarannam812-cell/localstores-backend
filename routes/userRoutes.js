@@ -565,26 +565,31 @@ router.get("/orders/:phone", (req, res) => {
 
 // ==================== CART MANAGEMENT ====================
 
-// Add to cart
+// Add to cart with duplicate check
 router.post("/cart/add", (req, res) => {
   const { phone, productId, selectedSize, quantity } = req.body;
+  if (!phone || !productId) return res.status(400).json({ error: "Phone and ProductId required" });
 
-  console.log("🛒 ADD TO CART");
-  console.log("  Phone:", phone);
-  console.log("  Product ID:", productId);
+  // First check if item exists
+  const checkSql = "SELECT * FROM cart WHERE user_mobile = ? AND product_id = ? AND selected_size = ?";
+  db.query(checkSql, [phone, productId, selectedSize || null], (err, results) => {
+    if (err) return res.status(500).json({ error: err.sqlMessage });
 
-  if (!phone || !productId) {
-    return res.status(400).json({ error: "Phone and productId required" });
-  }
-
-  const sql = "INSERT INTO cart (user_mobile, product_id, selected_size, quantity) VALUES (?, ?, ?, ?)";
-  db.query(sql, [phone, productId, selectedSize || null, quantity || 1], (err, result) => {
-    if (err) {
-      console.error("❌ Cart Add Error:", err.sqlMessage);
-      return res.status(500).json({ error: err.sqlMessage });
+    if (results.length > 0) {
+      // Update quantity
+      const updateSql = "UPDATE cart SET quantity = quantity + ? WHERE id = ?";
+      db.query(updateSql, [quantity || 1, results[0].id], (err) => {
+        if (err) return res.status(500).json({ error: err.sqlMessage });
+        res.json({ success: true, message: "Quantity updated" });
+      });
+    } else {
+      // Insert new
+      const insertSql = "INSERT INTO cart (user_mobile, product_id, selected_size, quantity) VALUES (?, ?, ?, ?)";
+      db.query(insertSql, [phone, productId, selectedSize || null, quantity || 1], (err) => {
+        if (err) return res.status(500).json({ error: err.sqlMessage });
+        res.json({ success: true, message: "Added to cart" });
+      });
     }
-    console.log("✅ Added to cart, ID:", result.insertId);
-    res.json({ success: true, cartId: result.insertId });
   });
 });
 
