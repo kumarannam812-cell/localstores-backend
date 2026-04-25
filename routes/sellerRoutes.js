@@ -135,6 +135,46 @@ router.post("/login", (req, res) => {
   );
 });
 
+// ==================== NOTIFICATION DEEP LINKS (PRIORITY) ====================
+
+// GET SINGLE OFFER BY ID
+router.get("/offer/:id", (req, res) => {
+  const { id } = req.params;
+  console.log("🔍 FETCHING OFFER DETAILS FOR NOTIFICATION - ID:", id);
+  db.query(`
+    SELECT bo.*, s.id as seller_id, s.shop_logo 
+    FROM bulk_offers bo 
+    JOIN sellers s ON bo.seller_id = s.id 
+    WHERE bo.id = ?
+  `, [id], (err, results) => {
+    if (err) {
+      console.error("❌ Deep Link Offer Error:", err.sqlMessage);
+      return res.status(500).json({ error: err.sqlMessage });
+    }
+    console.log(`✅ Deep Link OfferFound: ${results[0]?.offer_name || 'NULL'}`);
+    res.json(results[0] || null);
+  });
+});
+
+// GET SINGLE COLLECTION BY ID
+router.get("/collection/:id", (req, res) => {
+  const { id } = req.params;
+  console.log("🔍 FETCHING COLLECTION DETAILS FOR NOTIFICATION - ID:", id);
+  db.query(`
+    SELECT c.*, s.shop_name, s.shop_logo 
+    FROM collections c 
+    JOIN sellers s ON c.seller_id = s.id 
+    WHERE c.id = ?
+  `, [id], (err, results) => {
+    if (err) {
+      console.error("❌ Deep Link Collection Error:", err.sqlMessage);
+      return res.status(500).json({ error: err.sqlMessage });
+    }
+    console.log(`✅ Deep Link Collection Found: ${results[0]?.collection_name || 'NULL'}`);
+    res.json(results[0] || null);
+  });
+});
+
 // ==================== SELLER PROFILE ====================
 
 // 3. GET SELLER PROFILE
@@ -178,8 +218,8 @@ router.post("/add-product", (req, res) => {
   console.log("  price:", price);
 
   if (!seller_id || !name || !price || !shop) {
-    return res.status(400).json({ 
-      error: "Missing: seller_id, name, price, shop" 
+    return res.status(400).json({
+      error: "Missing: seller_id, name, price, shop"
     });
   }
 
@@ -195,8 +235,8 @@ router.post("/add-product", (req, res) => {
 
       if (sellers.length === 0) {
         console.error("❌ Seller not found with id:", seller_id);
-        return res.status(400).json({ 
-          error: `Seller ID ${seller_id} not found` 
+        return res.status(400).json({
+          error: `Seller ID ${seller_id} not found`
         });
       }
 
@@ -210,11 +250,11 @@ router.post("/add-product", (req, res) => {
       db.query(
         sql,
         [
-          parseInt(seller_id), 
-          name, 
-          parseFloat(price), 
-          image, 
-          shop, 
+          parseInt(seller_id),
+          name,
+          parseFloat(price),
+          image,
+          shop,
           category || "General",
           offer || 0,
           is_new !== false ? 1 : 0
@@ -230,9 +270,9 @@ router.post("/add-product", (req, res) => {
           console.log("  Seller ID:", seller_id);
           console.log("  Name:", name);
 
-          res.status(200).json({ 
+          res.status(200).json({
             success: true,
-            message: "Product added successfully", 
+            message: "Product added successfully",
             id: result.insertId,
             seller_id: seller_id
           });
@@ -262,7 +302,7 @@ router.get("/products/:sellerId", (req, res) => {
 
     console.log("✅ Products found:", products.length);
     console.log("  Seller ID:", sellerId);
-    
+
     if (products.length > 0) {
       console.log("  First product:", products[0].name, "- Price:", products[0].price);
     }
@@ -311,6 +351,7 @@ router.get("/orders/:sellerId", (req, res) => {
       o.price,
       o.order_date,
       o.shop_name,
+      o.status,
       o.selected_size,
       o.delivery_name,
       o.delivery_phone,
@@ -330,11 +371,51 @@ router.get("/orders/:sellerId", (req, res) => {
     }
 
     console.log("✅ Orders found:", orders.length);
-    if (orders.length > 0) {
-      console.log("  First order:", orders[0].product_name, "by", orders[0].user_name);
+    res.json(orders || []);
+  });
+});
+
+// Update order status
+router.put("/orders/:orderId/status", (req, res) => {
+  const { orderId } = req.params;
+  const { status } = req.body;
+
+  console.log(`📦 ATTEMPTING STATUS UPDATE - Order: ${orderId}, New Status: ${status}`);
+
+  if (!status) {
+    return res.status(400).json({ error: "Status required" });
+  }
+
+  // Use a single query to update and get user info for notification if possible, 
+  // or just update directly and then notify.
+  const updateSql = "UPDATE orders SET status = ? WHERE id = ?";
+  db.query(updateSql, [status, orderId], (err, result) => {
+    if (err) {
+      console.error("❌ SQL Status Update Error:", err.sqlMessage);
+      return res.status(500).json({ error: err.sqlMessage });
     }
 
-    res.json(orders || []);
+    if (result.affectedRows === 0) {
+      console.warn("⚠️ Order ID not found in DB:", orderId);
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    console.log("✅ Order updated in DB. Affected rows:", result.affectedRows);
+
+    // FETCH FOR VERIFICATION & NOTIFICATION
+    db.query("SELECT id, status, user_mobile, product_name FROM orders WHERE id = ?", [orderId], (err, results) => {
+      if (!err && results.length > 0) {
+        const { id, status, user_mobile, product_name } = results[0];
+        console.log(`🔍 VERIFICATION - Row ${id} now has Status: [${status}] in DB.`);
+
+        const notifSql = "INSERT INTO notifications (target_type, target_id, type, title, message, action_id) VALUES ('user', ?, 'order_status', ?, ?, ?)";
+        const notifTitle = `Order ${status}!`;
+        const notifMsg = `Your order for "${product_name}" is now: ${status}.`;
+        db.query(notifSql, [user_mobile, notifTitle, notifMsg, orderId]);
+      }
+    });
+
+    res.json({ success: true, message: `Status updated to ${status}` });
   });
 });
 // ==================== OFFERS ====================
@@ -415,8 +496,8 @@ router.post("/add-product-with-images", (req, res) => {
   console.log("  stock:", stock);
 
   if (!seller_id || !name || !price || !shop || !images || images.length === 0) {
-    return res.status(400).json({ 
-      error: "Missing: seller_id, name, price, shop, or images" 
+    return res.status(400).json({
+      error: "Missing: seller_id, name, price, shop, or images"
     });
   }
 
@@ -463,9 +544,9 @@ router.post("/add-product-with-images", (req, res) => {
             }
 
             console.log("✅ PRODUCT ADDED WITH DETAILS");
-            res.status(200).json({ 
+            res.status(200).json({
               success: true,
-              message: "Product added successfully", 
+              message: "Product added successfully",
               id: result.insertId
             });
           }
@@ -483,6 +564,15 @@ router.post("/add-product-with-images", (req, res) => {
           } else {
             db.query("INSERT INTO collections (seller_id, collection_name, collection_image) VALUES (?, ?, ?)", [seller_id, trimmedCol, images[0]], (err, newCol) => {
               if (err) return res.status(500).json({ error: err.sqlMessage });
+
+              // ✅ ADD NOTIFICATION for New Collection
+              const notifSql = "INSERT INTO notifications (target_type, target_id, type, title, message, action_id) VALUES ('all', 'all', 'new_collection', ?, ?, ?)";
+              const notifMsg = `New Collection Alert! "${trimmedCol}" is now available at ${shop}. Check it out!`;
+              const collectionId = newCol.insertId;
+              db.query(notifSql, [`New Collection: ${trimmedCol}`, notifMsg, collectionId], (err) => {
+                if (err) console.error("❌ Notification error:", err.message);
+              });
+
               insertProduct(newCol.insertId);
             });
           }
@@ -604,6 +694,14 @@ router.post("/create-bulk-offer", (req, res) => {
               res.status(500).json({ success: false, errors: errors });
             } else {
               console.log("✅ All products added to offer");
+
+              // ✅ ADD NOTIFICATION for New Offer
+              const notifSql = "INSERT INTO notifications (target_type, type, title, message, action_id) VALUES ('all', 'new_offer', ?, ?, ?)";
+              const notifMsg = `Special Offer! ${discount_percentage}% OFF at ${shop_name} on "${offer_name}". Limited time only!`;
+              db.query(notifSql, [`Mega Offer: ${offer_name}`, notifMsg, offerId], (err) => {
+                if (err) console.error("❌ Notification error:", err.message);
+              });
+
               res.status(201).json({
                 success: true,
                 message: "Bulk offer created successfully",
@@ -759,4 +857,46 @@ router.get("/collection-products/:sellerId/:colId", (req, res) => {
 });
 
 
+// 12. UPDATE ORDER STATUS
+router.put("/orders/:orderId/status", (req, res) => {
+  const { orderId } = req.params;
+  const { status } = req.body;
+
+  console.log("📅 UPDATE ORDER STATUS");
+  console.log("  Order ID:", orderId);
+  console.log("  New Status:", status);
+
+  if (!status) {
+    return res.status(400).json({ error: "Status is required" });
+  }
+
+  const sql = "UPDATE orders SET status = ? WHERE id = ?";
+  db.query(sql, [status, orderId], (err, result) => {
+    if (err) {
+      console.error("❌ Update Status Error:", err.sqlMessage);
+      return res.status(500).json({ error: err.sqlMessage });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    // ✅ ADD NOTIFICATION for User (Optional but good)
+    const getOrderSql = "SELECT user_mobile, product_name FROM orders WHERE id = ?";
+    db.query(getOrderSql, [orderId], (err, orders) => {
+      if (!err && orders.length > 0) {
+        const order = orders[0];
+        const notifSql = "INSERT INTO notifications (target_type, target_id, type, title, message) VALUES ('user', ?, 'order_update', ?, ?)";
+        const notifTitle = `Order ${status}!`;
+        const notifMsg = `Your order for "${order.product_name}" has been ${status.toLowerCase()}.`;
+        db.query(notifSql, [order.user_mobile, notifTitle, notifMsg]);
+      }
+    });
+
+    console.log("✅ Status updated successfully");
+    res.json({ success: true, message: "Status updated" });
+  });
+});
+
+// End of File
 module.exports = router;
