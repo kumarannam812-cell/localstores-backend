@@ -7,7 +7,7 @@ const db = require("../db");
 // 0. SIGNUP
 router.post("/signup", (req, res) => {
   const { name, phone, location } = req.body;
-  
+
   console.log("📝 USER SIGNUP REQUEST");
   console.log("  Phone:", phone);
   console.log("  Name:", name);
@@ -27,16 +27,16 @@ router.post("/signup", (req, res) => {
     }
 
     db.query(
-      "INSERT INTO users (name, phone, address) VALUES (?, ?, ?)", 
-      [name, phone, location || null], 
+      "INSERT INTO users (name, phone, address) VALUES (?, ?, ?)",
+      [name, phone, location || null],
       (err, result) => {
         if (err) {
           console.error("❌ Insertion Error:", err.sqlMessage);
           return res.status(500).json({ message: "Database error" });
         }
-        res.status(201).json({ 
-          success: true, 
-          user: { id: result.insertId, name, phone, address: location || "" } 
+        res.status(201).json({
+          success: true,
+          user: { id: result.insertId, name, phone, address: location || "" }
         });
       }
     );
@@ -46,7 +46,7 @@ router.post("/signup", (req, res) => {
 // 0. LOGIN
 router.post("/login", (req, res) => {
   const { phone } = req.body;
-  
+
   console.log("🔐 USER LOGIN REQUEST");
   console.log("  Phone:", phone);
 
@@ -63,7 +63,7 @@ router.post("/login", (req, res) => {
     if (users.length === 0) {
       return res.status(404).json({ message: "User not found, please sign up" });
     }
-    
+
     res.json({ success: true, user: users[0] });
   });
 });
@@ -110,6 +110,7 @@ router.get("/get-data/:phone", (req, res) => {
         o.image,
         o.price,
         o.shop_name,
+        o.status AS order_status,
         o.order_date,
         o.color,
         o.category,
@@ -149,6 +150,7 @@ router.get("/get-data/:phone", (req, res) => {
           product_name: order.product_name,
           image: order.image,
           price: order.price,
+          status: order.order_status || 'Pending',
           shop: order.shop_name,
           shop_name: order.shop_name,
           order_date: order.order_date,
@@ -380,6 +382,14 @@ router.post("/sync-order", (req, res) => {
 
         console.log("✅ Order created - Order ID:", result.insertId);
 
+        // ✅ ADD NOTIFICATION for Seller
+        const notifSql = "INSERT INTO notifications (target_type, target_id, type, title, message) VALUES ('seller', ?, 'new_order', ?, ?)";
+        const notifTitle = `New Order Received!`;
+        const notifMsg = `Great news! A new order has been placed for "${name}" (Item ID: ${productId}) from your shop.`;
+        db.query(notifSql, [sellerId, notifTitle, notifMsg], (err) => {
+          if (err) console.error("❌ Notification error:", err.message);
+        });
+
         // Step 3: Decrement stock
         const newStock = currentStock - 1;
         const stockSql = `UPDATE products SET stock = ? WHERE id = ?`;
@@ -390,7 +400,7 @@ router.post("/sync-order", (req, res) => {
           }
 
           console.log("✅ Stock updated - New Stock:", newStock);
-          
+
           res.status(201).json({
             success: true,
             orderId: result.insertId,
@@ -510,8 +520,8 @@ router.post("/cancel-order", (req, res) => {
       db.query(restoreQuery, restoreParams, (err, updateResult) => {
         if (err) {
           console.error("❌ Error restoring stock:", err.sqlMessage);
-          return res.status(500).json({ 
-            error: "Order cancelled but failed to restore stock" 
+          return res.status(500).json({
+            error: "Order cancelled but failed to restore stock"
           });
         }
 
@@ -550,6 +560,173 @@ router.get("/orders/:phone", (req, res) => {
 
     console.log("✅ Orders retrieved:", orders.length);
     res.json(orders || []);
+  });
+});
+
+// ==================== CART MANAGEMENT ====================
+
+// Add to cart
+router.post("/cart/add", (req, res) => {
+  const { phone, productId, selectedSize, quantity } = req.body;
+
+  console.log("🛒 ADD TO CART");
+  console.log("  Phone:", phone);
+  console.log("  Product ID:", productId);
+
+  if (!phone || !productId) {
+    return res.status(400).json({ error: "Phone and productId required" });
+  }
+
+  const sql = "INSERT INTO cart (user_mobile, product_id, selected_size, quantity) VALUES (?, ?, ?, ?)";
+  db.query(sql, [phone, productId, selectedSize || null, quantity || 1], (err, result) => {
+    if (err) {
+      console.error("❌ Cart Add Error:", err.sqlMessage);
+      return res.status(500).json({ error: err.sqlMessage });
+    }
+    console.log("✅ Added to cart, ID:", result.insertId);
+    res.json({ success: true, cartId: result.insertId });
+  });
+});
+
+// Get cart items
+router.get("/cart/:phone", (req, res) => {
+  const { phone } = req.params;
+
+  console.log("🛒 GET CART - Phone:", phone);
+
+  const sql = `
+    SELECT c.id as cartId, c.quantity, c.selected_size, p.* 
+    FROM cart c 
+    JOIN products p ON c.product_id = p.id 
+    WHERE c.user_mobile = ?
+  `;
+  db.query(sql, [phone], (err, results) => {
+    if (err) {
+      console.error("❌ Cart Get Error:", err.sqlMessage);
+      return res.status(500).json({ error: err.sqlMessage });
+    }
+    console.log("✅ Cart items found:", results.length);
+    res.json(results || []);
+  });
+});
+
+// Remove from cart
+router.delete("/cart/:cartId", (req, res) => {
+  const { cartId } = req.params;
+
+  console.log("🗑️ REMOVE FROM CART - ID:", cartId);
+
+  db.query("DELETE FROM cart WHERE id = ?", [cartId], (err) => {
+    if (err) {
+      console.error("❌ Cart Delete Error:", err.sqlMessage);
+      return res.status(500).json({ error: err.sqlMessage });
+    }
+    console.log("✅ Removed from cart");
+    res.json({ success: true });
+  });
+});
+
+// Place order from cart
+router.post("/sync-cart-order", (req, res) => {
+  const { phone, cartItems, deliveryInfo } = req.body;
+
+  console.log("📦 PLACE CART ORDER");
+  console.log("  Phone:", phone);
+  console.log("  Items:", cartItems?.length);
+
+  if (!phone || !cartItems || cartItems.length === 0) {
+    return res.status(400).json({ error: "Missing phone or cart items" });
+  }
+
+  let completed = 0;
+  let errors = [];
+
+  cartItems.forEach(item => {
+    const orderSql = `INSERT INTO orders 
+                 (user_mobile, user_name, product_id, product_name, image, price, shop_name, status, 
+                  selected_size, delivery_name, delivery_phone, delivery_address, delivery_landmark, order_date) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, 'Pending', ?, ?, ?, ?, ?, NOW())`;
+
+    // Support both formats of product objects
+    const productId = item.id || item.product_id || item.productId;
+    const productName = item.name || item.product_name;
+    const selectedSize = item.selected_size || item.selectedSize;
+
+    const params = [
+      phone, phone, productId, productName, item.image, item.price, item.shop || item.shop_name,
+      selectedSize || null, deliveryInfo.name, deliveryInfo.phone, deliveryInfo.address, deliveryInfo.landmark || null
+    ];
+
+    db.query(orderSql, params, (err) => {
+      if (err) {
+        console.error("❌ Multi-Order Error:", err.sqlMessage);
+        errors.push(err.sqlMessage);
+      }
+
+      // Decement stock
+      db.query("UPDATE products SET stock = stock - 1 WHERE id = ?", [productId]);
+
+      completed++;
+      if (completed === cartItems.length) {
+        // Clear cart
+        db.query("DELETE FROM cart WHERE user_mobile = ?", [phone]);
+        console.log("✅ All orders placed, cart cleared");
+        res.json({ success: true, message: "All orders placed", errors: errors.length > 0 ? errors : null });
+      }
+    });
+  });
+});
+
+// ==================== REVIEWS ====================
+
+router.post("/reviews/add", (req, res) => {
+  const { productId, phone, userName, rating, comment } = req.body;
+
+  console.log("⭐ ADD REVIEW");
+  console.log("  Product ID:", productId);
+  console.log("  Rating:", rating);
+
+  if (!productId || !phone || !rating) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+
+  const sql = "INSERT INTO reviews (product_id, user_mobile, user_name, rating, comment) VALUES (?, ?, ?, ?, ?)";
+  db.query(sql, [productId, phone, userName || 'User', rating, comment || null], (err, result) => {
+    if (err) {
+      console.error("❌ Review Add Error:", err.sqlMessage);
+      return res.status(500).json({ error: err.sqlMessage });
+    }
+    console.log("✅ Review added, ID:", result.insertId);
+    res.json({ success: true, reviewId: result.insertId });
+  });
+});
+
+router.get("/reviews/:productId", (req, res) => {
+  const { productId } = req.params;
+
+  console.log("⭐ GET REVIEWS - Product ID:", productId);
+
+  db.query("SELECT * FROM reviews WHERE product_id = ? ORDER BY created_at DESC", [productId], (err, results) => {
+    if (err) {
+      console.error("❌ Review Get Error:", err.sqlMessage);
+      return res.status(500).json({ error: err.sqlMessage });
+    }
+    res.json(results || []);
+  });
+});
+
+// SUBMIT SUPPORT MESSAGE
+router.post("/support", (req, res) => {
+  const { user_mobile, user_name, message } = req.body;
+  if (!message) return res.status(400).json({ error: "Message is required" });
+
+  const sql = "INSERT INTO support_messages (user_mobile, user_name, message) VALUES (?, ?, ?)";
+  db.query(sql, [user_mobile || "Guest", user_name || "Unknown", message], (err, result) => {
+    if (err) {
+      console.error("❌ Support Save Error:", err.sqlMessage);
+      return res.status(500).json({ error: err.sqlMessage });
+    }
+    res.json({ success: true, message: "Feedback sent successfully" });
   });
 });
 
