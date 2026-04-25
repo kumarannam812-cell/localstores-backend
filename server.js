@@ -7,6 +7,7 @@ const adminRoutes = require("./routes/adminRoutes");
 const userRoutes = require("./routes/userRoutes");
 const sellerRoutes = require("./routes/sellerRoutes");
 const productRoutes = require("./routes/productRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
 
 const app = express();
 
@@ -19,6 +20,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/sellers", sellerRoutes);
 app.use("/api/products", productRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // Health check
 app.get("/health", (req, res) => {
@@ -51,19 +53,34 @@ app.listen(PORT, () => {
 
 // ========== GET ALL UNIQUE SHOPS (For Home Screen Shop Buttons) ==========
 app.get("/api/active-shops", (req, res) => {
-  const sql = "SELECT DISTINCT shop FROM products WHERE shop IS NOT NULL";
-  
+  const sql = `
+    SELECT 
+      s.id,
+      s.shop_name as shop,
+      s.shop_logo,
+      s.position,
+      s.shop_size
+    FROM sellers s
+    WHERE s.is_approved = 1 AND (s.is_deleted IS NULL OR s.is_deleted = 0)
+    ORDER BY COALESCE(s.position, 999) ASC
+  `;
+
   db.query(sql, (err, results) => {
     if (err) {
+      console.error("❌ Active Shops Error:", err.sqlMessage);
       return res.status(500).json({ error: err.sqlMessage });
     }
-    
+
     // Transform to return shop names with metadata
     const shops = results.map(r => ({
-      name: r.shop,
-      displayName: r.shop.replace(/_/g, ' ').toUpperCase()
+      id: r.id,
+      name: r.shop || "Unknown",
+      displayName: (r.shop || "Unknown").replace(/_/g, ' ').toUpperCase(),
+      logo: r.shop_logo,
+      shop_logo: r.shop_logo, // ✅ Added for fallback compatibility
+      size: r.shop_size || 'normal'
     }));
-    
+
     res.json(shops);
   });
 });
@@ -105,7 +122,7 @@ app.post("/api/admin/simulate-approve", (req, res) => {
 // ==================== GET ALL APPROVED SELLERS ====================
 app.get("/api/approved-sellers", (req, res) => {
   console.log("📋 GET APPROVED SELLERS");
-  
+
   const sql = `
     SELECT 
       s.id,
@@ -131,7 +148,7 @@ app.get("/api/approved-sellers", (req, res) => {
     sellers.forEach(s => {
       console.log(`  - ${s.shop_name} (ID: ${s.id}): ${s.product_count} products`);
     });
-    
+
     res.json(sellers || []);
   });
 });
@@ -148,7 +165,7 @@ app.use((err, req, res, next) => {
 app.get("/api/admin/sellers", (req, res) => {
   console.log("📋 GET ALL SELLERS");
 
-  const sql = `SELECT id, seller_phone, shop_name, email, is_approved, created_at 
+  const sql = `SELECT id, seller_phone, shop_name, email, shop_logo, is_approved, created_at 
                FROM sellers 
                ORDER BY created_at DESC`;
 
@@ -223,7 +240,7 @@ app.post("/api/admin/reject-seller", (req, res) => {
 // GET ALL COLLECTIONS (Across all sellers)
 app.get("/api/sellers/all-collections", (req, res) => {
   console.log("📢 GET ALL COLLECTIONS FROM TABLE");
-  
+
   const sql = `
     SELECT 
       c.id as collection_id,
@@ -253,7 +270,7 @@ app.get("/api/sellers/all-collections", (req, res) => {
 // GET PRODUCTS BY COLLECTION
 app.get("/api/sellers/collection-products/:sellerId/:collectionId", (req, res) => {
   const { sellerId, collectionId } = req.params;
-  
+
   console.log("📢 GET COLLECTION PRODUCTS BY ID:", collectionId, "Seller:", sellerId);
 
   const sql = `
