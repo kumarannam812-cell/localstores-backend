@@ -57,6 +57,7 @@ router.get("/stats", (req, res) => {
               s.is_approved,
               s.is_deleted,
               s.created_at,
+              s.shop_logo,
               s.position,
               COUNT(DISTINCT p.id) as product_count,
               COUNT(DISTINCT o.id) as order_count
@@ -319,6 +320,43 @@ router.get("/sellers-by-position", (req, res) => {
 
     console.log("✅ Sellers by position:", sellers.length);
     res.json(sellers);
+  });
+});
+
+// ==================== UPDATE SHOP SIZE ====================
+router.post("/update-shop-size/:sellerId", (req, res) => {
+  const { sellerId } = req.params;
+  const { sizeType } = req.body;
+
+  console.log("📐 POST /api/admin/update-shop-size/" + sellerId);
+  console.log("   Size:", sizeType);
+
+  const sql = "UPDATE sellers SET shop_size = ? WHERE id = ?";
+
+  db.query(sql, [sizeType, sellerId], (err, result) => {
+    if (err) {
+      console.error("❌ Error:", err.sqlMessage);
+      return res.status(500).json({ error: err.sqlMessage });
+    }
+
+    console.log("✅ Shop size updated");
+    res.json({ success: true, message: "Shop size updated" });
+  });
+});
+
+// ==================== SUPPORT MESSAGES ====================
+router.get("/support-messages", (req, res) => {
+  db.query("SELECT * FROM support_messages ORDER BY created_at DESC", (err, results) => {
+    if (err) return res.status(500).json({ error: err.sqlMessage });
+    res.json(results || []);
+  });
+});
+
+router.post("/delete-support-message/:id", (req, res) => {
+  const { id } = req.params;
+  db.query("DELETE FROM support_messages WHERE id = ?", [id], (err) => {
+    if (err) return res.status(500).json({ error: err.sqlMessage });
+    res.json({ success: true });
   });
 });
 
