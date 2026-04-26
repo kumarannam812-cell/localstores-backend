@@ -277,15 +277,15 @@ router.post("/update-seller-positions", (req, res) => {
       if (completed === sellers.length) {
         if (errors.length > 0) {
           console.error("❌ Some errors occurred:", errors);
-          res.status(500).json({ 
-            success: false, 
+          res.status(500).json({
+            success: false,
             message: "Some updates failed",
-            errors: errors 
+            errors: errors
           });
         } else {
           console.log("✅ ALL POSITIONS UPDATED SUCCESSFULLY");
-          res.json({ 
-            success: true, 
+          res.json({
+            success: true,
             message: "All positions updated",
             updated: sellers.length
           });
@@ -357,6 +357,23 @@ router.post("/delete-support-message/:id", (req, res) => {
   db.query("DELETE FROM support_messages WHERE id = ?", [id], (err) => {
     if (err) return res.status(500).json({ error: err.sqlMessage });
     res.json({ success: true });
+  });
+});
+
+// ==================== CONTENT MANAGEMENT ====================
+router.post("/delete-bulk-offer/:id", (req, res) => {
+  const { id } = req.params;
+  db.query("DELETE FROM bulk_offers WHERE id = ?", [id], (err) => {
+    if (err) return res.status(500).json({ error: err.sqlMessage });
+    res.json({ success: true, message: "Offer deleted" });
+  });
+});
+
+router.post("/delete-collection/:id", (req, res) => {
+  const { id } = req.params;
+  db.query("DELETE FROM collections WHERE id = ?", [id], (err) => {
+    if (err) return res.status(500).json({ error: err.sqlMessage });
+    res.json({ success: true, message: "Collection deleted" });
   });
 });
 
