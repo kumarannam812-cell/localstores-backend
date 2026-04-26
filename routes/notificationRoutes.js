@@ -8,8 +8,8 @@ router.get("/:targetType/:targetId", (req, res) => {
 
   console.log(`🔔 GET NOTIFICATIONS - Type: ${targetType}, ID: ${targetId}`);
 
-  // Cleanup old read notifications (older than 24 hours)
-  const cleanupSql = "DELETE FROM notifications WHERE is_read = 1 AND created_at < NOW() - INTERVAL 24 HOUR";
+  // Cleanup old read notifications (exactly 24 hours AFTER they were read)
+  const cleanupSql = "DELETE FROM notifications WHERE is_read = 1 AND read_at IS NOT NULL AND read_at < NOW() - INTERVAL 24 HOUR";
   db.query(cleanupSql, (cleanupErr) => {
     if (cleanupErr) console.error("❌ Notification Cleanup Error:", cleanupErr.sqlMessage);
   });
@@ -42,7 +42,7 @@ router.post("/mark-read", (req, res) => {
   }
 
   const placeholders = ids.map(() => "?").join(",");
-  const sql = `UPDATE notifications SET is_read = 1 WHERE id IN (${placeholders})`;
+  const sql = `UPDATE notifications SET is_read = 1, read_at = CURRENT_TIMESTAMP WHERE id IN (${placeholders})`;
 
   db.query(sql, ids, (err) => {
     if (err) {
