@@ -382,11 +382,11 @@ router.post("/sync-order", (req, res) => {
 
         console.log("✅ Order created - Order ID:", result.insertId);
 
-        // ✅ ADD NOTIFICATION for Seller
-        const notifSql = "INSERT INTO notifications (target_type, target_id, type, title, message) VALUES ('seller', ?, 'new_order', ?, ?)";
+        // ✅ ADD NOTIFICATION for Seller (Include Product Image as Icon)
+        const notifSql = "INSERT INTO notifications (target_type, target_id, type, title, message, icon) VALUES ('seller', ?, 'new_order', ?, ?, ?)";
         const notifTitle = `New Order Received!`;
         const notifMsg = `Great news! A new order has been placed for "${name}" (Item ID: ${productId}) from your shop.`;
-        db.query(notifSql, [sellerId, notifTitle, notifMsg], (err) => {
+        db.query(notifSql, [sellerId, notifTitle, notifMsg, image], (err) => {
           if (err) console.error("❌ Notification error:", err.message);
         });
 
