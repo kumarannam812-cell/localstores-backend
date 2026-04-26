@@ -8,6 +8,12 @@ router.get("/:targetType/:targetId", (req, res) => {
 
   console.log(`🔔 GET NOTIFICATIONS - Type: ${targetType}, ID: ${targetId}`);
 
+  // Cleanup old read notifications (older than 24 hours)
+  const cleanupSql = "DELETE FROM notifications WHERE is_read = 1 AND created_at < NOW() - INTERVAL 24 HOUR";
+  db.query(cleanupSql, (cleanupErr) => {
+    if (cleanupErr) console.error("❌ Notification Cleanup Error:", cleanupErr.sqlMessage);
+  });
+
   let sql = "SELECT * FROM notifications WHERE (target_type = 'all')";
   const params = [];
 
