@@ -576,12 +576,15 @@ router.post("/add-product-with-images", (req, res) => {
             db.query("INSERT INTO collections (seller_id, collection_name, collection_image) VALUES (?, ?, ?)", [seller_id, trimmedCol, images[0]], (err, newCol) => {
               if (err) return res.status(500).json({ error: err.sqlMessage });
 
-              // ✅ ADD NOTIFICATION for New Collection
-              const notifSql = "INSERT INTO notifications (target_type, target_id, type, title, message, action_id) VALUES ('all', 'all', 'new_collection', ?, ?, ?)";
-              const notifMsg = `New Collection Alert! "${trimmedCol}" is now available at ${shop}. Check it out!`;
-              const collectionId = newCol.insertId;
-              db.query(notifSql, [`New Collection: ${trimmedCol}`, notifMsg, collectionId], (err) => {
-                if (err) console.error("❌ Notification error:", err.message);
+              // ✅ ADD NOTIFICATION for New Collection (With Logo)
+              db.query("SELECT shop_logo FROM sellers WHERE id = ?", [seller_id], (err, selRes) => {
+                const shopLogo = selRes && selRes.length > 0 ? selRes[0].shop_logo : images[0];
+                const notifSql = "INSERT INTO notifications (target_type, target_id, type, title, message, action_id, icon) VALUES ('all', 'all', 'new_collection', ?, ?, ?, ?)";
+                const notifMsg = `New Collection Alert! "${trimmedCol}" is now available at ${shop}. Check it out!`;
+                const collectionId = newCol.insertId;
+                db.query(notifSql, [`New Collection: ${trimmedCol}`, notifMsg, collectionId, shopLogo], (err) => {
+                  if (err) console.error("❌ Notification error:", err.message);
+                });
               });
 
               insertProduct(newCol.insertId);
@@ -706,11 +709,14 @@ router.post("/create-bulk-offer", (req, res) => {
             } else {
               console.log("✅ All products added to offer");
 
-              // ✅ ADD NOTIFICATION for New Offer
-              const notifSql = "INSERT INTO notifications (target_type, type, title, message, action_id) VALUES ('all', 'new_offer', ?, ?, ?)";
-              const notifMsg = `Special Offer! ${discount_percentage}% OFF at ${shop_name} on "${offer_name}". Limited time only!`;
-              db.query(notifSql, [`Mega Offer: ${offer_name}`, notifMsg, offerId], (err) => {
-                if (err) console.error("❌ Notification error:", err.message);
+              // ✅ ADD NOTIFICATION for New Offer (With Logo)
+              db.query("SELECT shop_logo FROM sellers WHERE id = ?", [seller_id], (err, selRes) => {
+                const shopLogo = selRes && selRes.length > 0 ? selRes[0].shop_logo : null;
+                const notifSql = "INSERT INTO notifications (target_type, target_id, type, title, message, action_id, icon) VALUES ('all', 'all', 'new_offer', ?, ?, ?, ?)";
+                const notifMsg = `Special Offer! ${discount_percentage}% OFF at ${shop_name} on "${offer_name}". Limited time only!`;
+                db.query(notifSql, [`Mega Offer: ${offer_name}`, notifMsg, offerId, shopLogo], (err) => {
+                  if (err) console.error("❌ Notification error:", err.message);
+                });
               });
 
               res.status(201).json({
