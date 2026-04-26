@@ -402,16 +402,27 @@ router.put("/orders/:orderId/status", (req, res) => {
 
     console.log("✅ Order updated in DB. Affected rows:", result.affectedRows);
 
-    // FETCH FOR VERIFICATION & NOTIFICATION
-    db.query("SELECT id, status, user_mobile, product_name FROM orders WHERE id = ?", [orderId], (err, results) => {
+    // FETCH FOR VERIFICATION & NOTIFICATION (Enhanced with Shop Logo)
+    const getOrderSql = `
+      SELECT o.user_mobile, o.product_name, s.shop_logo, s.shop_name 
+      FROM orders o
+      JOIN sellers s ON o.shop_name = s.shop_name
+      WHERE o.id = ?
+    `;
+    db.query(getOrderSql, [orderId], (err, results) => {
       if (!err && results.length > 0) {
-        const { id, status, user_mobile, product_name } = results[0];
-        console.log(`🔍 VERIFICATION - Row ${id} now has Status: [${status}] in DB.`);
-
-        const notifSql = "INSERT INTO notifications (target_type, target_id, type, title, message, action_id) VALUES ('user', ?, 'order_status', ?, ?, ?)";
+        const order = results[0];
+        const notifSql = "INSERT INTO notifications (target_type, target_id, type, title, message, action_id, icon) VALUES ('user', ?, 'order_status', ?, ?, ?, ?)";
         const notifTitle = `Order ${status}!`;
-        const notifMsg = `Your order for "${product_name}" is now: ${status}.`;
-        db.query(notifSql, [user_mobile, notifTitle, notifMsg, orderId]);
+        const notifMsg = `Your order for "${order.product_name}" from ${order.shop_name} has been ${status.toLowerCase()}.`;
+        
+        db.query(notifSql, [
+          order.user_mobile, 
+          notifTitle, 
+          notifMsg, 
+          orderId, 
+          order.shop_logo || null
+        ]);
       }
     });
 
@@ -881,15 +892,27 @@ router.put("/orders/:orderId/status", (req, res) => {
       return res.status(404).json({ error: "Order not found" });
     }
 
-    // ✅ ADD NOTIFICATION for User (Optional but good)
-    const getOrderSql = "SELECT user_mobile, product_name FROM orders WHERE id = ?";
-    db.query(getOrderSql, [orderId], (err, orders) => {
-      if (!err && orders.length > 0) {
-        const order = orders[0];
-        const notifSql = "INSERT INTO notifications (target_type, target_id, type, title, message) VALUES ('user', ?, 'order_update', ?, ?)";
+    // ✅ ADD NOTIFICATION for User (Enhanced with Shop Logo)
+    const getOrderSql = `
+      SELECT o.user_mobile, o.product_name, s.shop_logo, s.shop_name 
+      FROM orders o
+      JOIN sellers s ON o.shop_name = s.shop_name
+      WHERE o.id = ?
+    `;
+    db.query(getOrderSql, [orderId], (err, results) => {
+      if (!err && results.length > 0) {
+        const order = results[0];
+        const notifSql = "INSERT INTO notifications (target_type, target_id, type, title, message, action_id, icon) VALUES ('user', ?, 'order_status', ?, ?, ?, ?)";
         const notifTitle = `Order ${status}!`;
-        const notifMsg = `Your order for "${order.product_name}" has been ${status.toLowerCase()}.`;
-        db.query(notifSql, [order.user_mobile, notifTitle, notifMsg]);
+        const notifMsg = `Your order for "${order.product_name}" from ${order.shop_name} has been ${status.toLowerCase()}.`;
+        
+        db.query(notifSql, [
+          order.user_mobile, 
+          notifTitle, 
+          notifMsg, 
+          orderId, 
+          order.shop_logo || null
+        ]);
       }
     });
 
