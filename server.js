@@ -64,7 +64,12 @@ app.get("/privacy-policy", (req, res) => {
       <p>We have put in place appropriate security measures to prevent your personal data from being accidentally lost, used or accessed in an unauthorised way, altered or disclosed.</p>
 
       <h2>5. Contact Us</h2>
-      <p>If you have any questions about this privacy policy or our privacy practices, please contact us through our application's support feature.</p>
+      <p>If you have any questions about this privacy policy or our privacy practices, please contact us:</p>
+      <ul>
+        <li><strong>Developer:</strong> Annam Sharath</li>
+        <li><strong>Email:</strong> support@localstores.com (or your actual email)</li>
+        <li><strong>Address:</strong> India</li>
+      </ul>
     </body>
     </html>
   `);
