@@ -539,10 +539,34 @@ router.post("/cancel-order", (req, res) => {
       });
     });
   });
+});// ==================== RETURN ORDER ====================
+
+router.post("/return-order", (req, res) => {
+  const { phone, orderId } = req.body;
+
+  console.log("↩️ RETURN ORDER REQUEST");
+  console.log("  Order ID:", orderId);
+
+  if (!phone || !orderId) {
+    return res.status(400).json({ error: "Phone and orderId required" });
+  }
+
+  // Update status to Returned if it is Delivered
+  const query = "UPDATE orders SET status = 'Returned' WHERE id = ? AND user_mobile = ? AND status = 'Delivered'";
+  
+  db.query(query, [orderId, phone], (err, result) => {
+    if (err) {
+      console.error("❌ Database error:", err.sqlMessage);
+      return res.status(500).json({ error: "Failed to return order" });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(400).json({ error: "Order not found or cannot be returned (must be Delivered status)." });
+    }
+
+    res.json({ success: true, message: "Order returned successfully" });
+  });
 });
-
-
-
 
 
 // ==================== GET USER ORDERS ONLY ====================
@@ -670,6 +694,16 @@ router.post("/sync-cart-order", (req, res) => {
 
       // Decement stock
       db.query("UPDATE products SET stock = stock - 1 WHERE id = ?", [productId]);
+
+      // ✅ ADD NOTIFICATION for Seller (Include Product Image as Icon)
+      if (item.seller_id) {
+        const notifSql = "INSERT INTO notifications (target_type, target_id, type, title, message, icon) VALUES ('seller', ?, 'new_order', ?, ?, ?)";
+        const notifTitle = `New Order Received!`;
+        const notifMsg = `Great news! A new order has been placed for "${productName}" (Item ID: ${productId}) from your shop.`;
+        db.query(notifSql, [item.seller_id, notifTitle, notifMsg, item.image], (err) => {
+          if (err) console.error("❌ Notification error:", err.message);
+        });
+      }
 
       completed++;
       if (completed === cartItems.length) {
