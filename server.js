@@ -63,7 +63,11 @@ app.get("/privacy-policy", (req, res) => {
       <h2>4. Data Security</h2>
       <p>We have put in place appropriate security measures to prevent your personal data from being accidentally lost, used or accessed in an unauthorised way, altered or disclosed.</p>
 
-      <h2>5. Contact Us</h2>
+      <h2>5. Refund & Cancellation Policy</h2>
+      <p><strong>Cancellations:</strong> You can cancel your order at any time before it has been marked as "Accepted" or "Shipped" by the seller. Simply go to the "Orders" tab and click "Cancel Order". If an order is already shipped, cancellation is no longer possible.</p>
+      <p><strong>Refunds:</strong> If you paid via Cash on Delivery, no refund is necessary for cancelled orders. If you paid online and the order is cancelled or rejected by the seller, the full amount will be refunded to your original payment method within 5-7 business days. If you receive a defective or incorrect item, please contact the seller directly through the app within 48 hours of delivery for a replacement or refund.</p>
+
+      <h2>6. Contact Us</h2>
       <p>If you have any questions about this privacy policy or our privacy practices, please contact us:</p>
       <ul>
         <li><strong>Developer:</strong> Annam Sharath</li>
