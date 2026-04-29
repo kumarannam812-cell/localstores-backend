@@ -65,14 +65,14 @@ app.get("/privacy-policy", (req, res) => {
 
       <h2>5. Refund & Cancellation Policy</h2>
       <p><strong>Cancellations:</strong> You can cancel your order at any time before it has been marked as "Accepted" or "Shipped" by the seller. Simply go to the "Orders" tab and click "Cancel Order". If an order is already shipped, cancellation is no longer possible.</p>
-      <p><strong>Refunds:</strong> If you paid via Cash on Delivery, no refund is necessary for cancelled orders. If you paid online and the order is cancelled or rejected by the seller, the full amount will be refunded to your original payment method within 5-7 business days. If you receive a defective or incorrect item, please contact the seller directly through the app within 48 hours of delivery for a replacement or refund.</p>
+      <p><strong>Refunds:</strong> product will be return if not satisfied by the user within 24 hourse only after 24 hours returning product is not possible. amount will be refund within 24 hourse after return the order.</p>
 
       <h2>6. Contact Us</h2>
       <p>If you have any questions about this privacy policy or our privacy practices, please contact us:</p>
       <ul>
         <li><strong>Developer:</strong> Annam Sharath</li>
-        <li><strong>Email:</strong> support@localstores.com (or your actual email)</li>
-        <li><strong>Address:</strong> India</li>
+        <li><strong>Email:</strong> sharathannam718@gmail.com</li>
+        <li><strong>Address:</strong> Hyderabad, India</li>
       </ul>
     </body>
     </html>
