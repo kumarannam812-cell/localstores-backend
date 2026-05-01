@@ -348,9 +348,12 @@ router.post("/sync-order", (req, res) => {
                           delivery_name,
                           delivery_phone,
                           delivery_address,
-                          delivery_landmark
+                          pincode,
+                          delivery_landmark,
+                          status,
+                          seller_id
                         ) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+                        VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
       const params = [
         phone,                           // user_mobile
@@ -369,7 +372,10 @@ router.post("/sync-order", (req, res) => {
         deliveryName || null,
         deliveryPhone || null,
         deliveryAddress || null,
-        deliveryLandmark || null
+        req.body.deliveryPincode || null,
+        deliveryLandmark || null,
+        'Pending',
+        sellerId
       ];
 
       console.log("📤 Order SQL params:", params);
@@ -673,17 +679,18 @@ router.post("/sync-cart-order", (req, res) => {
   cartItems.forEach(item => {
     const orderSql = `INSERT INTO orders 
                  (user_mobile, user_name, product_id, product_name, image, price, shop_name, status, 
-                  selected_size, delivery_name, delivery_phone, delivery_address, delivery_landmark, order_date) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, 'Pending', ?, ?, ?, ?, ?, NOW())`;
+                  selected_size, delivery_name, delivery_phone, delivery_address, pincode, delivery_landmark, order_date, seller_id) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, 'Pending', ?, ?, ?, ?, ?, ?, NOW(), ?)`;
 
     // Support both formats of product objects
     const productId = item.id || item.product_id || item.productId;
     const productName = item.name || item.product_name;
     const selectedSize = item.selected_size || item.selectedSize;
+    const sellerId = item.seller_id || item.sellerId;
 
     const params = [
       phone, phone, productId, productName, item.image, item.price, item.shop || item.shop_name,
-      selectedSize || null, deliveryInfo.name, deliveryInfo.phone, deliveryInfo.address, deliveryInfo.landmark || null
+      selectedSize || null, deliveryInfo.name, deliveryInfo.phone, deliveryInfo.address, deliveryInfo.pincode || null, deliveryInfo.landmark || null, sellerId
     ];
 
     db.query(orderSql, params, (err) => {
