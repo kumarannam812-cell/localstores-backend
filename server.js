@@ -63,6 +63,9 @@ app.get("/privacy-policy", (req, res) => {
       <h2>4. Data Security</h2>
       <p>We have put in place appropriate security measures to prevent your personal data from being accidentally lost, used or accessed in an unauthorised way, altered or disclosed.</p>
 
+      <h2>4. Delivery Policy</h2>
+      <p>We deliver to all pincodes across India. All orders are processed within 24-48 hours of acceptance by the seller. Estimated delivery time varies between 3 to 7 business days depending on your location. You will receive real-time updates on your order status through the "Orders" tab in the app.</p>
+
       <h2>5. Refund & Cancellation Policy</h2>
       <p><strong>Cancellations:</strong> You can cancel your order at any time before it has been marked as "Accepted" or "Shipped" by the seller. Simply go to the "Orders" tab and click "Cancel Order". If an order is already shipped, cancellation is no longer possible.</p>
       <p><strong>Refunds:</strong> product will be return if not satisfied by the user within 24 hourse only after 24 hours returning product is not possible. amount will be refund within 24 hourse after return the order.</p>
