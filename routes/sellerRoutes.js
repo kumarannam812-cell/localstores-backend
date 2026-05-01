@@ -342,25 +342,12 @@ router.get("/orders/:sellerId", (req, res) => {
   // JOIN orders with products to get seller_id and filter by seller
   const sql = `
     SELECT 
-      o.id,
-      o.user_mobile,
-      o.user_name,
-      o.product_id,
-      o.product_name,
-      o.image,
-      o.price,
-      o.order_date,
-      o.shop_name,
-      o.status,
-      o.selected_size,
-      o.delivery_name,
-      o.delivery_phone,
-      o.delivery_address,
-      o.delivery_landmark,
-      p.seller_id
+      o.id, o.user_mobile, o.user_name, o.product_id, o.product_name, 
+      o.image, o.price, o.order_date, o.shop_name, o.status, 
+      o.selected_size, o.delivery_name, o.delivery_phone, 
+      o.delivery_address, o.pincode, o.delivery_landmark, o.seller_id
     FROM orders o
-    JOIN products p ON o.product_id = p.id
-    WHERE p.seller_id = ?
+    WHERE o.seller_id = ?
     ORDER BY o.order_date DESC
   `;
 
